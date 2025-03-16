@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智能比例计算器</title>
+    <style>
+        /* 样式部分保持不变 */
+        :root { --primary-color: #4CAF50; --secondary-color: #2196F3; --background: #f8f9fa; }
+        body { font-family: 'Segoe UI', system-ui; background: var(--background); margin: 0; padding: 2rem; display: flex; justify-content: center; }
+        .calculator { background: white; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); padding: 2rem; width: 600px; }
+        .header { text-align: center; margin-bottom: 1.5rem; }
+        .input-group { display: grid; grid-template-columns: 1fr auto 1fr; gap: 1rem; align-items: center; margin-bottom: 1rem; position: relative; }
+        input { padding: 0.8rem; border: 2px solid #ddd; border-radius: 8px; font-size: 1rem; transition: all 0.3s ease; }
+        input:focus { border-color: var(--primary-color); box-shadow: 0 0 8px rgba(76, 175, 80, 0.3); }
+        .operator { font-size: 1.2rem; color: var(--secondary-color); text-align: center; }
+        .total-row { display: flex; justify-content: flex-end; align-items: center; margin-top: 2rem; padding-top: 1rem; border-top: 2px solid #eee; }
+        .add-button { background: var(--primary-color); color: white; border: none; padding: 0.8rem 1.5rem; border-radius: 8px; cursor: pointer; transition: transform 0.2s ease; width: 100%; margin-top: 1rem; }
+        .add-button:hover { transform: translateY(-2px); }
+        .delete-btn { position: absolute; right: -32px; top: 50%; transform: translateY(-50%); color: #ff4444; cursor: pointer; opacity: 0; transition: opacity 0.3s ease; }
+        .input-group:hover .delete-btn { opacity: 1; }
+        .input-group.invalid input { border-color: #ff4444; background: #fff5f5; }
+    </style>
+</head>
+<body>
+    <div class="calculator">
+        <div class="header">
+            <h2>⚖️ 智能比例计算器</h2>
+            <p>修改任意值自动重新计算，支持动态增减行</p>
+        </div>
+        <div id="inputContainer"></div>
+        <button class="add-button" onclick="addNewRow()">➕ 添加新比例行</button>
+        <div class="total-row">
+            <span style="margin-right: 1rem; font-weight: 500;">总重量：</span>
+            <input type="text" id="totalSum" readonly style="background: #f3f4f6; font-weight: bold; width: 120px;">
+        </div>
+    </div>
+
+    <script>
+        let baseRow = null;
+        
+        // 创建空输入行
+        function createInputRow() {
+            const group = document.createElement('div');
+            group.className = 'input-group';
+            group.innerHTML = `
+                <input type="number" class="ratio-input" placeholder="比例" step="0.1">
+                <div class="operator">×</div>
+                <input type="number" class="weight-input" placeholder="重量" step="0.1">
+                <span class="delete-btn" onclick="removeRow(this)">🗑️</span>
+            `;
+        
+            group.querySelectorAll('input').forEach(input => {
+                input.addEventListener('input', handleInput);
+            });
+            return group;
+        }
+        
+        function handleInput(e) {
+            const row = e.target.closest('.input-group');
+            row.classList.toggle('invalid', !isValidRow(row));
+            
+            // 设置基准行逻辑（仅通过重量修改）
+            if (e.target.classList.contains('weight-input') && isValidRow(row)) {
+                baseRow = row; // 更新基准行
+            }
+            calculateWeights();
+        }
+        
+        function isValidRow(row) {
+            const ratioInput = row.querySelector('.ratio-input');
+            const weightInput = row.querySelector('.weight-input');
+            return ratioInput.value && weightInput.value;
+        }
+        
+        function removeRow(btn) {
+            const row = btn.closest('.input-group');
+            if (row === baseRow) {
+                // 自动选择新的基准行
+                baseRow = Array.from(document.querySelectorAll('.input-group'))
+                             .find(r => r !== row && isValidRow(r));
+            }
+            row.remove();
+            calculateWeights();
+        }
+        
+        function addNewRow() {
+            const container = document.getElementById('inputContainer');
+            container.appendChild(createInputRow());
+            calculateWeights();
+        }
+        
+        // 优化后的核心计算逻辑
+        function calculateWeights() {
+            const rows = document.querySelectorAll('.input-group');
+            let total = 0;
+            
+            // 自动选择有效基准行
+            if (!baseRow || !isValidRow(baseRow)) {
+                baseRow = Array.from(rows).find(row => isValidRow(row));
+            }
+        
+            // 获取基准数据
+            let baseRatio, baseWeight;
+            if (baseRow && isValidRow(baseRow)) {
+                baseRatio = parseFloat(baseRow.querySelector('.ratio-input').value);
+                baseWeight = parseFloat(baseRow.querySelector('.weight-input').value);
+            }
+        
+            // 重新计算所有行
+            rows.forEach(row => {
+                const ratioInput = row.querySelector('.ratio-input');
+                const weightInput = row.querySelector('.weight-input');
+                const ratio = parseFloat(ratioInput.value) || 0;
+        
+                if (row === baseRow) {
+                    // 基准行保持原值
+                    weightInput.value = baseWeight.toFixed(2);
+                } else if (baseRatio && baseWeight) {
+                    // 其他行强制重新计算
+                    const newWeight = (baseWeight * ratio / baseRatio).toFixed(2);
+                    weightInput.value = newWeight;
+                }
+        
+                total += parseFloat(weightInput.value) || 0;
+            });
+        
+            document.getElementById('totalSum').value = total.toFixed(2);
+        }
+        // 初始化时添加首行
+        addNewRow();    
+        </script>        
